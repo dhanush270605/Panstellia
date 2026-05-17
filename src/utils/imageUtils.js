@@ -37,6 +37,21 @@ export const getDirectImageUrl = (url) => {
 };
 
 /**
+ * Normalizes a product's image list.
+ * Prefers `product.images` (array) and falls back to `product.image` (string).
+ * Always returns a string array of direct image URLs.
+ */
+export const getProductImageUrls = (product) => {
+  const rawImages = Array.isArray(product?.images) ? product.images : [];
+  const fallback = product?.image ? [product.image] : [];
+  const images = rawImages.length > 0 ? rawImages : fallback;
+
+  return images
+    .filter(Boolean)
+    .map((img) => getDirectImageUrl(img));
+};
+
+/**
  * Validates if a URL is a valid image URL (either direct or gdrive)
  * @param {string} url - The URL to validate
  * @returns {boolean} - True if valid

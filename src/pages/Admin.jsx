@@ -24,6 +24,8 @@ const AdminPage = () => {
     price: '',
     originalPrice: '',
     image: '',
+    imagesText: '',
+
     category: 'Gold',
     featured: false,
     inStock: true
@@ -75,12 +77,25 @@ const AdminPage = () => {
     setLoading(true);
 
     try {
+      const images = productForm.imagesText
+        ? productForm.imagesText
+            .split(',')
+            .map(s => s.trim())
+            .filter(Boolean)
+        : [];
+
       const productData = {
         ...productForm,
+        images: images.length > 0 ? images : undefined,
         price: parseInt(productForm.price),
         originalPrice: productForm.originalPrice ? parseInt(productForm.originalPrice) : null,
         id: editingProduct?.id || `prod_${Date.now()}`
       };
+
+      // Backward-compatible single image field
+      if (!productData.images || productData.images.length === 0) {
+        productData.image = productForm.image;
+      }
 
       if (editingProduct) {
         await updateProduct(editingProduct.id, productData);
@@ -109,12 +124,17 @@ const AdminPage = () => {
 
   const handleEdit = (product) => {
     setEditingProduct(product);
+    const imagesText = Array.isArray(product.images)
+      ? product.images.join(', ')
+      : '';
+
     setProductForm({
       name: product.name,
       description: product.description,
       price: product.price.toString(),
       originalPrice: product.originalPrice?.toString() || '',
       image: product.image,
+      imagesText,
       category: product.category,
       featured: product.featured,
       inStock: product.inStock
@@ -164,9 +184,9 @@ const AdminPage = () => {
             </div>
           </div>
           <div className="bg-white rounded-xl shadow-md p-6">
-            <div className="flex items-center">
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <ShoppingBag className="w-6 h-6 text-blue-600" />
+      <div className="flex items-center">
+                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <ShoppingBag className="w-6 h-6 text-blue-600" />
               </div>
               <div className="ml-4">
                 <p className="text-2xl font-bold text-luxury-900">{stats.totalOrders}</p>
@@ -316,6 +336,21 @@ const AdminPage = () => {
                             placeholder="https://..."
                             className="input-field"
                           />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium mb-1">Multiple Images (comma separated)</label>
+                          <input
+                            type="text"
+                            name="imagesText"
+                            value={productForm.imagesText}
+                            onChange={handleInputChange}
+                            placeholder="https://... , https://..."
+                            className="input-field"
+                          />
+                          <p className="text-xs text-luxury-500 mt-1">
+                            Optional. Used to create <code>product.images</code> (array). If empty, your single <code>image</code> is used as fallback.
+                          </p>
                         </div>
                         <div>
                           <label className="block text-sm font-medium mb-1">Category</label>

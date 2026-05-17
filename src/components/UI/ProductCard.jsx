@@ -4,7 +4,8 @@ import { useCart } from '../../context/CartContext';
 import { useWishlist } from '../../context/WishlistContext';
 import { useState } from 'react';
 import { toast } from 'react-toastify';
-import { getDirectImageUrl } from '../../utils/imageUtils';
+import { getProductImageUrls } from '../../utils/imageUtils';
+
 
 const ProductCard = ({ product }) => {
   const { addToCart } = useCart();
@@ -46,8 +47,9 @@ const discount = product.originalPrice
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
     : 0;
 
-  // Convert Google Drive URLs to direct image URLs
-  const imageUrl = getDirectImageUrl(product.image);
+  const imageUrls = getProductImageUrls(product);
+  const imageUrl = imageUrls[0] || '';
+
 
   return (
     <div className="block cursor-pointer">

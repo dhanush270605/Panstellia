@@ -5,7 +5,10 @@ import { useProducts } from '../context/ProductContext';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
 import { toast } from 'react-toastify';
-import { getDirectImageUrl } from '../utils/imageUtils';
+import { getProductImageUrls, getDirectImageUrl } from '../utils/imageUtils';
+
+
+
 import SEOHelmet from '../utils/seoHelmet';
 import { getProductSchema } from '../utils/structuredData';
 
@@ -43,10 +46,12 @@ const wishlisted = isInWishlist(product.id);
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
     : 0;
 
-  // Convert Google Drive URLs to direct image URLs
-  const imageUrl = getDirectImageUrl(product.image);
+  const imageUrls = getProductImageUrls(product);
+  const imageUrl = imageUrls[selectedImage] || imageUrls[0] || '';
+
 
   const relatedProducts = products
+
     .filter(p => p.category === product.category && p.id !== product.id)
     .slice(0, 4);
 
@@ -86,11 +91,11 @@ const wishlisted = isInWishlist(product.id);
         description={product.description || `Shop ${product.name} - Premium ${product.category} jewelry from Panstellia. ${product.inStock ? 'In stock' : 'Out of stock'}.`}
         keywords={`${product.name}, ${product.category} necklace, jewelry`}
         canonical={`https://panstellia.com/product/${product.id}`}
-        ogImage={getDirectImageUrl(product.image)}
+        ogImage={imageUrl}
         structuredData={getProductSchema({
           name: product.name,
           description: product.description,
-          image: getDirectImageUrl(product.image),
+          image: imageUrl,
           price: product.price,
           inStock: product.inStock,
           rating: product.rating || 4.5,
@@ -126,8 +131,8 @@ const wishlisted = isInWishlist(product.id);
                 </div>
               )}
             </div>
-            <div className="flex gap-4 overflow-x-auto scrollbar-hide">
-              {[imageUrl].map((img, index) => (
+              <div className="flex gap-4 overflow-x-auto scrollbar-hide">
+              {imageUrls.map((img, index) => (
                 <button
                   key={index}
                   onClick={() => setSelectedImage(index)}
