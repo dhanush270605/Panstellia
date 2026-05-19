@@ -1,8 +1,19 @@
 # TODO
 
-- [x] Add admin order status buttons (picked, packed, shipped, out of delivery, delivered) in src/pages/Admin.jsx
-- [x] Persist status updates to Firestore (updateDoc on orders/{orderId})
-- [x] Update Admin UI state immediately after changing status
-- [x] Verify user pages reflect updated status via Firestore (already uses order.status)
+- [ ] Implement client-side filtering UI + logic on `src/pages/ReportsAdmin.jsx`:
+  - [ ] Add filter bar (Search, Payment Mode, City, Date From/To, Min/Max Value)
+  - [ ] Include `createdAt` inside each flattened report row for date filtering
+  - [ ] Use `useMemo` to derive `filteredRows`
+  - [ ] Update stats (Rows + Total value) to reflect filtered results
+  - [ ] Fix `colSpan` for empty state row
+  - [ ] Add Reset filters button
 
+- [ ] Implement client-side filtering UI + logic on `src/pages/Orders.jsx`:
+  - [ ] Add filter bar (Search, Status, Date From/To, Min/Max Total)
+  - [ ] Use `useMemo` to derive `filteredOrders`
+  - [ ] Render filtered list
+  - [ ] Show “No matching orders” empty state + Reset button when filters exclude all
+  - [ ] Add Reset filters button
+
+- [ ] Run build/lint to ensure JSX compiles.
 

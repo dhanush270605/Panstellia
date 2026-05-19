@@ -16,6 +16,7 @@ import {
 } from 'firebase/firestore';
 import { getDirectImageUrl } from '../utils/imageUtils';
 import RevenueAdmin from './RevenueAdmin';
+import ReportsAdmin from './ReportsAdmin';
 
 const AdminPage = () => {
   const navigate = useNavigate();
@@ -305,6 +306,16 @@ const AdminPage = () => {
                 }`}
               >
                 Revenue
+              </button>
+              <button
+                onClick={() => setActiveTab('reports')}
+                className={`py-4 border-b-2 font-medium ${
+                  activeTab === 'reports'
+                    ? 'border-gold-500 text-gold-600'
+                    : 'border-transparent text-luxury-500 hover:text-luxury-700'
+                }`}
+              >
+                Reports
               </button>
             </nav>
           </div>
@@ -744,6 +755,7 @@ const AdminPage = () => {
             )}
 
             {activeTab === 'revenue' && <RevenueAdmin />}
+            {activeTab === 'reports' && <ReportsAdmin />}
           </div>
         </div>
       </div>
