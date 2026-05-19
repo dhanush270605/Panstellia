@@ -126,7 +126,9 @@ const AdminPage = () => {
 
       const productData = {
         ...productForm,
-        images: images.length > 0 ? images : undefined,
+        // Firestore rejects undefined values in documents.
+        // So we omit `images` entirely when none are provided.
+        ...(images.length > 0 ? { images } : {}),
         price: parseInt(productForm.price, 10),
         originalPrice: productForm.originalPrice
           ? parseInt(productForm.originalPrice, 10)
