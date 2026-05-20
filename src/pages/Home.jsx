@@ -14,7 +14,7 @@ const HomePage = () => {
   const [currentHeroImageIndex, setCurrentHeroImageIndex] = useState(0);
 
   const heroImages = [
-    'https://i.ibb.co/Y4gqFfR7/file-00000000ac6071faa883472373c39bb9.png',
+    'https://i.ibb.co/XrZ5X2Xb/file-00000000d6a0720b95ee2e9a7326b873.png',
     'https://i.ibb.co/5Wcxtywf/1000096799-ezremove.png',
     'https://i.ibb.co/v6D0LrQG/file-0000000035cc71fa963321ed9c5ee32f.png',
     'https://i.ibb.co/HfHynYrb/file-00000000501871fabeb3ad48399d23bd.png',
