@@ -214,29 +214,20 @@ const Navbar = () => {
 
       {/* Mobile Menu */}
       {isOpen && (
-        <div className="md:hidden bg-white shadow-lg animate-slide-up">
-          <div className="px-4 py-4 space-y-4">
-            <Link to="/" className="block text-luxury-700 hover:text-gold-600" onClick={() => setIsOpen(false)}>
-              Home
-            </Link>
-            <Link to="/products" className="block text-luxury-700 hover:text-gold-600" onClick={() => setIsOpen(false)}>
-              Shop
-            </Link>
-            <Link to="/products?category=Gold" className="block text-luxury-700 hover:text-gold-600" onClick={() => setIsOpen(false)}>
-              {getCategoryLabel('Gold')}
-            </Link>
-            <Link to="/products?category=Silver" className="block text-luxury-700 hover:text-gold-600" onClick={() => setIsOpen(false)}>
-              {getCategoryLabel('Silver')}
-            </Link>
-            <Link to="/products?category=Lux Wear" className="block text-luxury-700 hover:text-gold-600" onClick={() => setIsOpen(false)}>
-              {getCategoryLabel('Lux Wear')}
-            </Link>
-            <Link to="/category/elegant-spark" className="block text-luxury-700 hover:text-gold-600" onClick={() => setIsOpen(false)}>
-              {getCategoryLabel('Elegant Spark')}
-            </Link>
-            <Link to="/products?category=Piercings" className="block text-luxury-700 hover:text-gold-600" onClick={() => setIsOpen(false)}>
-              {getCategoryLabel('Piercings')}
-            </Link>
+        <div className="md:hidden border-t border-gold-100/80 bg-white/95 shadow-lg backdrop-blur animate-slide-up">
+          <div className="grid grid-cols-2 gap-2 px-4 py-4">
+            {navItems.map(({ to, label, icon: Icon, isActive }) => (
+              <Link
+                key={to}
+                to={to}
+                className={`mobile-nav-glow-link ${isActive ? 'mobile-nav-glow-link--active' : ''}`}
+                aria-current={isActive ? 'page' : undefined}
+                onClick={() => setIsOpen(false)}
+              >
+                <Icon className="relative z-10 h-5 w-5 flex-shrink-0" />
+                <span className="relative z-10 truncate">{label}</span>
+              </Link>
+            ))}
           </div>
         </div>
       )}

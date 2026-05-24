@@ -4,7 +4,7 @@ import { CreditCard, Lock, ChevronLeft, Truck } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
-import { createRazorpayOrder, verifyPayment, openCheckout } from '../services/payment';
+import { openCheckout } from '../services/payment';
 import { db } from '../services/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 
@@ -141,30 +141,29 @@ const CheckoutPage = () => {
         throw new Error('Minimum order amount is ₹1');
       }
 
-      // Step 1: Create order on our backend (which calls Razorpay API)
-      const orderData = await createRazorpayOrder(amountInPaise, 'INR', {
-        receipt: `order_${Date.now()}`,
-        notes: {
-          userId: user.uid,
-          customerEmail: formData.email,
-          customerName: formData.name,
-        },
-      });
+      const paymentItems = cartItems.map((ci) => ({
+        name: ci.name,
+        price: ci.price,
+        quantity: ci.quantity,
+        image: ci.image,
+      }));
 
-      const { order_id } = orderData;
-
-      // Step 2: Open Razorpay checkout with order_id
+      // Spark-plan flow: open Razorpay without server-side order creation.
+      // After successful payment, persist the order directly in Firestore.
       const razorpayOptions = {
         amount: amountInPaise,
         currency: 'INR',
         name: 'Panstellia',
         description: 'Purchase of necklace jewelry',
         image: 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=200',
-        order_id: order_id, // Use the order_id from our backend
         prefill: {
           name: formData.name,
           email: formData.email,
           contact: formData.phone,
+        },
+        notes: {
+          userId: user.uid,
+          customerEmail: formData.email,
         },
         theme: {
           color: '#db912d',
@@ -172,64 +171,60 @@ const CheckoutPage = () => {
         // Handle successful payment
         onSuccess: async (response) => {
           try {
-            // Step 3: Verify payment signature
-            const verificationResult = await verifyPayment(
-              response.razorpay_payment_id,
-              response.razorpay_order_id,
-              response.razorpay_signature
-            );
-
-            if (verificationResult.verified) {
-              toast.success('Payment successful!', {
-                position: 'bottom-right',
-              });
-
-              // Persist payment record in Firestore (Spark-plan compatible)
-              try {
-                const paymentMethod = 'razorpay';
-                const orderId = response.razorpay_payment_id;
-                const phone = formData.phone;
-
-                await addDoc(collection(db, 'payments'), {
-                  orderId,
-                  customerName: formData.name,
-                  phone,
-                  amount: total * 100, // keep paise
-                  paymentMethod,
-                  paymentStatus: 'Paid',
-                  createdAt: serverTimestamp(),
-                  items: cartItems.map((ci) => ({
-                    name: ci.name,
-                    price: ci.price,
-                    quantity: ci.quantity,
-                    image: ci.image,
-                  })),
-                  userId: user.uid,
-                });
-              } catch (e) {
-                console.error('Failed to store payment in Firestore:', e);
-                toast.error('Payment succeeded, but saving payment record failed.', {
-                  position: 'bottom-right',
-                });
-              }
-
-              // Clear cart
-              await clearCart();
-
-              // Navigate to success page
-              navigate('/order-success', {
-                state: {
-                  orderId: response.razorpay_payment_id,
-                  items: cartItems,
-                  total,
-                },
-              });
-            } else {
-              throw new Error('Payment verification failed');
+            const paymentId = response.razorpay_payment_id;
+            if (!paymentId) {
+              throw new Error('Razorpay did not return a payment id');
             }
+
+            const orderRef = await addDoc(collection(db, 'orders'), {
+              userId: user.uid,
+              customerName: formData.name,
+              email: formData.email,
+              phone: formData.phone,
+              total,
+              amount: amountInPaise,
+              items: paymentItems,
+              status: 'processing',
+              createdAt: serverTimestamp(),
+              paymentMethod: 'razorpay',
+              paymentStatus: 'Paid',
+              razorpayPaymentId: paymentId,
+              address: formData.address,
+              city: formData.city,
+              state: formData.state,
+              pincode: formData.pincode,
+            });
+
+            await addDoc(collection(db, 'payments'), {
+              orderId: orderRef.id,
+              razorpayPaymentId: paymentId,
+              customerName: formData.name,
+              phone: formData.phone,
+              amount: amountInPaise,
+              paymentMethod: 'razorpay',
+              paymentStatus: 'Paid',
+              createdAt: serverTimestamp(),
+              items: paymentItems,
+              userId: user.uid,
+            });
+
+            toast.success('Payment successful!', {
+              position: 'bottom-right',
+            });
+
+            await clearCart();
+
+            navigate('/order-success', {
+              state: {
+                orderId: orderRef.id,
+                paymentId,
+                items: cartItems,
+                total,
+              },
+            });
           } catch (error) {
-            console.error('Payment verification error:', error);
-            toast.error('Payment verification failed. Please contact support.', {
+            console.error('Payment save error:', error);
+            toast.error('Payment completed, but saving order failed. Please contact support.', {
               position: 'bottom-right',
             });
           }

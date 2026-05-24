@@ -246,32 +246,35 @@ const HomePage = () => {
             </Link>
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 items-stretch gap-4 lg:grid-cols-4">
             {offers.map((offer, index) => (
               <motion.div
                 key={offer.title}
                 initial={{ opacity: 0, y: 18 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.08 }}
+                className="h-full"
               >
                 <Link
                   to={offer.to}
-                  className={`group relative block overflow-hidden rounded-xl bg-gradient-to-br ${offer.tone} p-5 min-h-40 text-white shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl`}
+                  className={`group relative flex h-36 overflow-hidden rounded-xl bg-gradient-to-br ${offer.tone} p-4 text-white shadow-lg transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl sm:h-40 sm:p-5`}
                 >
                   <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.34),transparent_38%)] opacity-80"></div>
-                  <div className="relative z-10 flex h-full min-h-32 flex-col justify-between">
+                  <div className="relative z-10 flex h-full min-w-0 flex-1 flex-col justify-between">
                     <div className="flex items-center justify-between">
-                      <offer.icon className="w-7 h-7 drop-shadow" />
-                      <span className="rounded-full bg-white/18 px-3 py-1 text-xs font-semibold backdrop-blur-sm">
+                      <offer.icon className="h-6 w-6 shrink-0 drop-shadow sm:h-7 sm:w-7" />
+                      <span className="rounded-full bg-white/18 px-2 py-1 text-[10px] font-semibold backdrop-blur-sm sm:px-3 sm:text-xs">
                         Limited
                       </span>
                     </div>
-                    <div>
-                      <h3 className="mt-8 font-serif text-2xl font-bold leading-tight">{offer.title}</h3>
-                      <p className="mt-2 text-sm text-white/85">{offer.text}</p>
-                      <span className="mt-4 inline-flex items-center text-sm font-semibold">
+                    <div className="min-w-0">
+                      <h3 className="font-serif text-lg font-bold leading-tight sm:text-2xl">{offer.title}</h3>
+                      <p className="mt-1 line-clamp-2 min-h-[2rem] text-xs leading-4 text-white/85 sm:mt-2 sm:text-sm">
+                        {offer.text}
+                      </p>
+                      <span className="mt-2 inline-flex items-center text-xs font-semibold sm:mt-4 sm:text-sm">
                         Shop now
-                        <ArrowRight className="ml-2 w-4 h-4 transition-transform group-hover:translate-x-1" />
+                        <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
                       </span>
                     </div>
                   </div>

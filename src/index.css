@@ -120,6 +120,67 @@
     transform: scaleX(1);
   }
 
+  .mobile-nav-glow-link {
+    @apply relative flex min-w-0 items-center gap-2 rounded-xl px-3 py-3 text-sm font-medium text-luxury-700 transition-all duration-300;
+    text-shadow: 0 0 0 rgba(219, 145, 45, 0);
+  }
+
+  .mobile-nav-glow-link::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 0.75rem;
+    background: radial-gradient(circle at 1.75rem 50%, rgba(245, 187, 71, 0.22), rgba(245, 187, 71, 0));
+    opacity: 0;
+    transform: scale(0.96);
+    transition: opacity 300ms ease, transform 300ms ease;
+    pointer-events: none;
+  }
+
+  .mobile-nav-glow-link::after {
+    content: "";
+    position: absolute;
+    left: 1rem;
+    right: 1rem;
+    bottom: 0.35rem;
+    height: 2px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #db912d, #f5bb47, transparent);
+    opacity: 0;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: opacity 300ms ease, transform 300ms ease;
+    box-shadow: 0 0 14px rgba(219, 145, 45, 0.38);
+  }
+
+  .mobile-nav-glow-link:hover,
+  .mobile-nav-glow-link:focus-visible {
+    @apply text-gold-600;
+    background: rgba(255, 255, 255, 0.72);
+    text-shadow: 0 0 12px rgba(219, 145, 45, 0.32);
+  }
+
+  .mobile-nav-glow-link:hover::before,
+  .mobile-nav-glow-link:focus-visible::before,
+  .mobile-nav-glow-link--active::before {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .mobile-nav-glow-link:hover::after,
+  .mobile-nav-glow-link:focus-visible::after,
+  .mobile-nav-glow-link--active::after {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+
+  .mobile-nav-glow-link--active {
+    @apply text-gold-600;
+    background: rgba(255, 255, 255, 0.84);
+    box-shadow: 0 10px 28px rgba(219, 145, 45, 0.12), inset 0 0 0 1px rgba(219, 145, 45, 0.14);
+    text-shadow: 0 0 12px rgba(219, 145, 45, 0.3);
+  }
+
   .nav-active-label {
     @apply relative z-10 max-w-40 overflow-hidden whitespace-nowrap text-sm font-semibold;
     animation: navLabelReveal 220ms ease both;

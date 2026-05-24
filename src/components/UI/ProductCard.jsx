@@ -95,14 +95,14 @@ const discount = product.originalPrice
 
   return (
     <div
-      className="block cursor-pointer"
+      className="block h-full cursor-pointer"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => {
         setIsHovered(false);
         setActiveImageIndex(0);
       }}
     >
-      <div className="card relative overflow-hidden group transition-transform hover:-translate-y-1">
+      <div className="card relative flex h-full flex-col overflow-hidden group transition-transform hover:-translate-y-1">
 
 
         {/* Image Container */}
@@ -172,19 +172,19 @@ const discount = product.originalPrice
         </div>
 
         {/* Content */}
-        <Link to={`/product/${product.id}`} className="block p-4 hover:opacity-90 transition-opacity">
+        <Link to={`/product/${product.id}`} className="flex flex-1 flex-col p-4 hover:opacity-90 transition-opacity">
           {/* Category */}
-          <p className="text-xs text-gold-600 font-medium uppercase tracking-wider">
+          <p className="h-4 truncate text-xs text-gold-600 font-medium uppercase tracking-wider">
             {getCategoryLabel(product.category)}
           </p>
           
           {/* Name */}
-          <h3 className="mt-1 text-luxury-900 font-medium line-clamp-2 group-hover:text-gold-600 transition-colors">
+          <h3 className="mt-1 min-h-[2.75rem] text-luxury-900 font-medium leading-snug line-clamp-2 group-hover:text-gold-600 transition-colors">
             {product.name}
           </h3>
           
           {/* Rating */}
-          <div className="mt-2 flex items-center">
+          <div className="mt-2 flex h-5 items-center">
             <div className="flex items-center">
               {[...Array(5)].map((_, i) => (
                 <Star
@@ -203,19 +203,19 @@ const discount = product.originalPrice
           </div>
           
           {/* Price */}
-          <div className="mt-2 flex items-center gap-2">
-            <span className="text-lg font-semibold text-luxury-900">
+          <div className="mt-2 flex h-7 items-center gap-2 overflow-hidden">
+            <span className="truncate text-lg font-semibold text-luxury-900">
               ₹{product.price?.toLocaleString()}
             </span>
             {product.originalPrice && (
-              <span className="text-sm text-luxury-400 line-through">
+              <span className="shrink-0 text-sm text-luxury-400 line-through">
                 ₹{product.originalPrice.toLocaleString()}
               </span>
             )}
           </div>
 
           {/* Stock Status */}
-          <div className="mt-2 flex items-center gap-2">
+          <div className="mt-auto flex h-6 items-center gap-2 pt-2">
             <Check className="w-4 h-4 text-green-500" />
             <span className="text-sm text-green-600 font-medium">
               {product.inStock ? 'In Stock' : 'Out of Stock'}
