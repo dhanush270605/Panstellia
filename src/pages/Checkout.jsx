@@ -4,7 +4,7 @@ import { CreditCard, Lock, ChevronLeft, Truck } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import { toast } from 'react-toastify';
-import { createRazorpayOrder, verifyPayment, openCheckout } from '../services/payment';
+import { createRazorpayOrder, verifyPayment, openCheckout, markPaymentFailed } from '../services/payment';
 import { db } from '../services/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { sendOrderNotifications, formatOrderDataForEmail } from '../services/orderNotifications';
@@ -168,6 +168,15 @@ const CheckoutPage = () => {
       // Razorpay flow
       // Calculate amount in paise (Razorpay expects paise)
       const amountInPaise = Math.round(total * 100);
+      const authToken = await user.getIdToken();
+      const cartItemsSnapshot = cartItems.map((ci) => ({
+        id: ci.id,
+        name: ci.name,
+        price: ci.price,
+        quantity: ci.quantity,
+        image: ci.image,
+        category: ci.category,
+      }));
 
       // Validate minimum amount (100 paise = ₹1)
       if (amountInPaise < 100) {
@@ -177,22 +186,52 @@ const CheckoutPage = () => {
       // Step 1: Create order on our backend (which calls Razorpay API)
       const orderData = await createRazorpayOrder(amountInPaise, 'INR', {
         receipt: `order_${Date.now()}`,
+        authToken,
         notes: {
           userId: user.uid,
           customerEmail: formData.email,
           customerName: formData.name,
         },
+        customer: {
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+        },
+        items: cartItemsSnapshot,
+        totals: {
+          subtotal,
+          shipping,
+          tax,
+          total,
+        },
+        shippingAddress: {
+          address: formData.address,
+          city: formData.city,
+          state: formData.state,
+          pincode: formData.pincode,
+        },
       });
 
-      const { order_id } = orderData;
+      const { order_id, order_number } = orderData;
+
+      const markCurrentPaymentFailed = async (reason, paymentId) => {
+        try {
+          await markPaymentFailed(order_id, {
+            authToken,
+            paymentId,
+            reason,
+          });
+        } catch (statusError) {
+          console.error('Failed to update failed payment status:', statusError);
+        }
+      };
 
       // Step 2: Open Razorpay checkout with order_id
       const razorpayOptions = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_SkY8Bdi8iAl2go',
         amount: amountInPaise,
         currency: 'INR',
         name: 'Panstellia',
-        description: 'Purchase of necklace jewelry',
+        description: `Panstellia jewellery order ${order_number || order_id}`,
         image: 'https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=200',
         order_id: order_id, // Use the order_id from our backend
         prefill: {
@@ -210,7 +249,8 @@ const CheckoutPage = () => {
             const verificationResult = await verifyPayment(
               response.razorpay_payment_id,
               response.razorpay_order_id,
-              response.razorpay_signature
+              response.razorpay_signature,
+              { authToken }
             );
 
             if (verificationResult.verified) {
@@ -218,38 +258,9 @@ const CheckoutPage = () => {
                 position: 'bottom-right',
               });
 
-              // Persist payment record in Firestore (Spark-plan compatible)
-              try {
-                const paymentMethod = 'razorpay';
-                const orderId = response.razorpay_payment_id;
-                const phone = formData.phone;
-
-                await addDoc(collection(db, 'payments'), {
-                  orderId,
-                  customerName: formData.name,
-                  phone,
-                  amount: total * 100, // keep paise
-                  paymentMethod,
-                  paymentStatus: 'Paid',
-                  createdAt: serverTimestamp(),
-                  items: cartItems.map((ci) => ({
-                    name: ci.name,
-                    price: ci.price,
-                    quantity: ci.quantity,
-                    image: ci.image,
-                  })),
-                  userId: user.uid,
-                });
-              } catch (e) {
-                console.error('Failed to store payment in Firestore:', e);
-                toast.error('Payment succeeded, but saving payment record failed.', {
-                  position: 'bottom-right',
-                });
-              }
-
               // 🚀 Send order confirmation and admin notification emails
               try {
-                const orderId = response.razorpay_payment_id;
+                const orderId = verificationResult.order_number || order_number || response.razorpay_order_id;
                 const emailData = formatOrderDataForEmail({
                   orderId,
                   customerName: formData.name,
@@ -260,15 +271,10 @@ const CheckoutPage = () => {
                   shippingCity: formData.city,
                   shippingState: formData.state,
                   shippingPincode: formData.pincode,
-                  cartItems: cartItems.map((ci) => ({
-                    name: ci.name,
-                    price: ci.price,
-                    quantity: ci.quantity,
-                    image: ci.image,
-                  })),
+                  cartItems: cartItemsSnapshot,
                   total,
-                  tax: 0,
-                  shipping: 0,
+                  tax,
+                  shipping,
                 });
 
                 const adminEmail = import.meta.env.VITE_ADMIN_EMAIL || 'admin@panstellia.com';
@@ -291,8 +297,8 @@ const CheckoutPage = () => {
               // Navigate to success page
               navigate('/order-success', {
                 state: {
-                  orderId: response.razorpay_payment_id,
-                  items: cartItems,
+                  orderId: verificationResult.order_number || order_number || response.razorpay_order_id,
+                  items: cartItemsSnapshot,
                   total,
                 },
               });
@@ -301,13 +307,23 @@ const CheckoutPage = () => {
             }
           } catch (error) {
             console.error('Payment verification error:', error);
+            await markCurrentPaymentFailed(error.message || 'Payment verification failed', response.razorpay_payment_id);
             toast.error('Payment verification failed. Please contact support.', {
               position: 'bottom-right',
             });
           }
         },
+        onFailure: async (response) => {
+          const paymentId = response?.error?.metadata?.payment_id;
+          const reason = response?.error?.description || response?.error?.reason || 'Payment failed';
+          await markCurrentPaymentFailed(reason, paymentId);
+          toast.error(reason, {
+            position: 'bottom-right',
+          });
+        },
         // Handle modal dismiss (user cancelled)
-        onDismiss: () => {
+        onDismiss: async () => {
+          await markCurrentPaymentFailed('Payment cancelled by customer');
           toast.info('Payment cancelled', {
             position: 'bottom-right',
           });

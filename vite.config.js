@@ -35,7 +35,11 @@ const createRazorpayDevApi = (env) => ({
     server.middlewares.use(async (req, res, next) => {
       const url = req.url?.split('?')[0]
 
-      if (url !== '/api/create-order' && url !== '/api/verify-payment') {
+      if (
+        url !== '/api/create-order' &&
+        url !== '/api/verify-payment' &&
+        url !== '/api/mark-payment-failed'
+      ) {
         next()
         return
       }
@@ -94,20 +98,45 @@ const createRazorpayDevApi = (env) => ({
 
           const data = await response.json().catch(() => ({}))
           if (!response.ok) {
+            const gatewayMessage =
+              data?.error?.description ||
+              data?.error?.reason ||
+              data?.error?.code ||
+              'Failed to create payment order'
+            const authFailed =
+              response.status === 401 ||
+              gatewayMessage.toLowerCase().includes('authentication failed')
+
             sendJson(res, response.status, {
-              error:
-                data?.error?.description ||
-                data?.error?.reason ||
-                data?.error?.code ||
-                'Failed to create payment order',
+              error: authFailed
+                ? 'Razorpay authentication failed. Check that RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET are from the same Razorpay key pair, then restart the dev server.'
+                : gatewayMessage,
             })
             return
           }
 
           sendJson(res, 200, {
             order_id: data.id,
+            local_order_id: data.id,
+            order_number: receipt || data.id,
             amount: data.amount,
             currency: data.currency,
+          })
+          return
+        }
+
+        if (url === '/api/mark-payment-failed') {
+          const { razorpay_order_id } = body
+          if (!razorpay_order_id) {
+            sendJson(res, 400, { error: 'Missing required field: razorpay_order_id' })
+            return
+          }
+
+          sendJson(res, 200, {
+            ok: true,
+            paymentStatus: 'Failed',
+            local_order_id: razorpay_order_id,
+            order_number: razorpay_order_id,
           })
           return
         }
@@ -135,6 +164,8 @@ const createRazorpayDevApi = (env) => ({
           verified: true,
           payment_id: razorpay_payment_id,
           order_id: razorpay_order_id,
+          local_order_id: razorpay_order_id,
+          order_number: razorpay_order_id,
         })
       } catch (error) {
         console.error('[razorpay-dev-api]', error)

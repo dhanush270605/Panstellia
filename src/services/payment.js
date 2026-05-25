@@ -22,6 +22,9 @@ const CREATE_ORDER_URL =
 const VERIFY_PAYMENT_URL =
   import.meta.env.VITE_FIREBASE_VERIFY_PAYMENT_URL ||
   (import.meta.env.DEV ? '/api/verify-payment' : getDefaultFunctionUrl('verifyPayment'));
+const MARK_PAYMENT_FAILED_URL =
+  import.meta.env.VITE_FIREBASE_MARK_PAYMENT_FAILED_URL ||
+  (import.meta.env.DEV ? '/api/mark-payment-failed' : getDefaultFunctionUrl('markPaymentFailed'));
 
 
 
@@ -141,12 +144,17 @@ export const createRazorpayOrder = async (amountPaise, currency = 'INR', options
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      ...(options.authToken ? { Authorization: `Bearer ${options.authToken}` } : {}),
     },
     body: JSON.stringify({
       amount: amountPaise,
       currency,
       receipt: options.receipt,
       notes: options.notes || {},
+      customer: options.customer,
+      items: options.items,
+      totals: options.totals,
+      shippingAddress: options.shippingAddress,
     }),
   });
 
@@ -166,13 +174,14 @@ export const createRazorpayOrder = async (amountPaise, currency = 'INR', options
  * Verify Razorpay payment signature via Firebase Functions.
  * Signature verification happens server-side using RAZORPAY_KEY_SECRET.
  */
-export const verifyPayment = async (paymentId, orderId, signature) => {
+export const verifyPayment = async (paymentId, orderId, signature, options = {}) => {
   if (!VERIFY_PAYMENT_URL) throw new Error('Missing VITE_FIREBASE_VERIFY_PAYMENT_URL');
 
   const response = await fetch(VERIFY_PAYMENT_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      ...(options.authToken ? { Authorization: `Bearer ${options.authToken}` } : {}),
     },
     body: JSON.stringify({
       razorpay_payment_id: paymentId,
@@ -191,11 +200,37 @@ export const verifyPayment = async (paymentId, orderId, signature) => {
   return data;
 };
 
+export const markPaymentFailed = async (orderId, options = {}) => {
+  if (!MARK_PAYMENT_FAILED_URL) throw new Error('Missing VITE_FIREBASE_MARK_PAYMENT_FAILED_URL');
+  if (!orderId) return null;
+
+  const response = await fetch(MARK_PAYMENT_FAILED_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(options.authToken ? { Authorization: `Bearer ${options.authToken}` } : {}),
+    },
+    body: JSON.stringify({
+      razorpay_order_id: orderId,
+      razorpay_payment_id: options.paymentId,
+      reason: options.reason || 'Payment was not completed',
+    }),
+  });
+
+  if (!response.ok) {
+    const err = await parseErrorResponse(response);
+    throw new Error(err || 'Failed to update payment status');
+  }
+
+  return response.json();
+};
+
 
 /**
  * Open Razorpay checkout modal.
  * @param {object} options Razorpay checkout options plus:
  *  - onSuccess(response)
+ *  - onFailure(response)
  *  - onDismiss()
  */
 export const openCheckout = async (options) => {
@@ -229,6 +264,10 @@ export const openCheckout = async (options) => {
     rzp = createRazorpayInstance(RazorpayCheckout, checkoutOptions);
   }
 
+  if (typeof options.onFailure === 'function' && typeof rzp.on === 'function') {
+    rzp.on('payment.failed', options.onFailure);
+  }
+
   rzp.open();
   return rzp;
 };
@@ -237,6 +276,7 @@ export default {
   loadRazorpay,
   createRazorpayOrder,
   verifyPayment,
+  markPaymentFailed,
   openCheckout,
 };
 

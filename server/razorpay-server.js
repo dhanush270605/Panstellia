@@ -143,7 +143,10 @@ app.post('/create-order', async (req, res) => {
     console.error('Error creating order:', error);
 
     if (error?.statusCode === 401 || error?.razorpayError?.code === 'AUTHENTICATION_FAILURE') {
-      return res.status(401).json({ error: 'Payment gateway authentication failed' });
+      return res.status(401).json({
+        error:
+          'Razorpay authentication failed. Check that RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET are from the same Razorpay key pair, then restart the server.',
+      });
     }
 
     if (error?.statusCode) {
