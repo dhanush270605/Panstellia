@@ -7,6 +7,7 @@ import { toast } from 'react-toastify';
 import { createRazorpayOrder, verifyPayment, openCheckout } from '../services/payment';
 import { db } from '../services/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { sendOrderNotifications, formatOrderDataForEmail } from '../services/orderNotifications';
 
 import { getDirectImageUrl } from '../utils/imageUtils';
 import SEOHelmet from '../utils/seoHelmet';
@@ -107,6 +108,38 @@ const CheckoutPage = () => {
             state: formData.state,
             pincode: formData.pincode,
           });
+
+          // 🚀 Send order confirmation and admin notification emails
+          try {
+            const emailData = formatOrderDataForEmail({
+              orderId,
+              customerName: formData.name,
+              customerEmail: formData.email,
+              customerPhone: formData.phone,
+              paymentMethod,
+              shippingAddress: formData.address,
+              shippingCity: formData.city,
+              shippingState: formData.state,
+              shippingPincode: formData.pincode,
+              cartItems: paymentItems,
+              total,
+              tax: 0,
+              shipping: 0,
+            });
+
+            const adminEmail = import.meta.env.VITE_ADMIN_EMAIL || 'admin@panstellia.com';
+            const emailResults = await sendOrderNotifications(emailData, adminEmail);
+
+            if (emailResults.customerEmail.sent) {
+              console.log('✅ Customer confirmation email sent');
+            }
+            if (emailResults.adminEmail.sent) {
+              console.log('✅ Admin notification email sent');
+            }
+          } catch (emailError) {
+            console.error('⚠️ Email sending error (order still placed):', emailError);
+            // Don't fail the order if email fails - notify but continue
+          }
 
           await clearCart();
 
@@ -212,6 +245,44 @@ const CheckoutPage = () => {
                 toast.error('Payment succeeded, but saving payment record failed.', {
                   position: 'bottom-right',
                 });
+              }
+
+              // 🚀 Send order confirmation and admin notification emails
+              try {
+                const orderId = response.razorpay_payment_id;
+                const emailData = formatOrderDataForEmail({
+                  orderId,
+                  customerName: formData.name,
+                  customerEmail: formData.email,
+                  customerPhone: formData.phone,
+                  paymentMethod: 'razorpay',
+                  shippingAddress: formData.address,
+                  shippingCity: formData.city,
+                  shippingState: formData.state,
+                  shippingPincode: formData.pincode,
+                  cartItems: cartItems.map((ci) => ({
+                    name: ci.name,
+                    price: ci.price,
+                    quantity: ci.quantity,
+                    image: ci.image,
+                  })),
+                  total,
+                  tax: 0,
+                  shipping: 0,
+                });
+
+                const adminEmail = import.meta.env.VITE_ADMIN_EMAIL || 'admin@panstellia.com';
+                const emailResults = await sendOrderNotifications(emailData, adminEmail);
+
+                if (emailResults.customerEmail.sent) {
+                  console.log('✅ Customer confirmation email sent');
+                }
+                if (emailResults.adminEmail.sent) {
+                  console.log('✅ Admin notification email sent');
+                }
+              } catch (emailError) {
+                console.error('⚠️ Email sending error (order still placed):', emailError);
+                // Don't fail the order if email fails - notify but continue
               }
 
               // Clear cart
