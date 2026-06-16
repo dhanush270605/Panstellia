@@ -77,21 +77,6 @@ const discount = product.originalPrice
   }, [activeImageIndex, imageUrls.length]);
 
 
-  const productStatus = product.productStatus || 'available';
-
-  const statusBadge = (
-    <div
-      className={`absolute top-3 left-3 badge pointer-events-none ${
-        productStatus === 'available'
-          ? 'badge-success'
-          : productStatus === 'shipped'
-            ? 'badge-warning'
-            : 'badge-error'
-      }`}
-    >
-      {productStatus}
-    </div>
-  );
 
   return (
     <div
@@ -107,7 +92,6 @@ const discount = product.originalPrice
 
         {/* Image Container */}
         <Link to={`/product/${product.id}`} className="block relative overflow-hidden aspect-[4/5]">
-          {statusBadge}
           <img
             key={imageUrl}
             src={imageUrl}
