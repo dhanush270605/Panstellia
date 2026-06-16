@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Filter, X, Grid, List } from 'lucide-react';
 import { useProducts } from '../context/ProductContext';
 import ProductCard from '../components/UI/ProductCard';
@@ -9,24 +9,18 @@ import { getCategoryLabel, categoryLabelMap } from '../utils/categoryLabels';
 
 const ProductsPage = () => {
   const getCanonicalCategoryKeyFromQuery = (queryCategory) => {
-    // The app sometimes receives display labels from the URL query (e.g. category=Piercings)
-    // while product.category is stored as the canonical key (e.g. Party Wear).
     if (!queryCategory || queryCategory === 'All') return 'All';
-
-    // If the query already matches a canonical key, use it directly.
     if (Object.prototype.hasOwnProperty.call(categoryLabelMap, queryCategory)) return queryCategory;
-
-    // Otherwise try to reverse-map display label -> canonical key.
     const entry = Object.entries(categoryLabelMap).find(([, displayLabel]) => displayLabel === queryCategory);
     return entry ? entry[0] : queryCategory;
   };
+
   const [searchParams, setSearchParams] = useSearchParams();
   const { products, loading } = useProducts();
 
   const visibleProducts = products.filter((p) => (p.productStatus || 'available') === 'available');
 
   const [filteredProducts, setFilteredProducts] = useState([]);
-
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState('grid');
   const searchQuery = searchParams.get('search') || '';
@@ -36,14 +30,13 @@ const ProductsPage = () => {
   const sortByQuery = searchParams.get('sortBy') || 'newest';
   
   const [filters, setFilters] = useState({
-    categories: categoryQuery ? categoryQuery.split(',') : [],
+    category: categoryQuery || 'All',
     minPrice: minPriceQuery,
     maxPrice: maxPriceQuery,
-    sortBy: sortByQuery || 'newest',
-    inStockOnly: false
+    sortBy: sortByQuery
   });
 
-  const categories = ['Gold', 'Silver', 'Lux Wear', 'Party Wear', 'Elegant Spark'];
+  const categories = ['All', 'Gold', 'Silver', 'Lux Wear', 'Party Wear', 'Elegant Spark'];
   const sortOptions = [
     { value: 'newest', label: 'Newest' },
     { value: 'price-low', label: 'Price: Low to High' },
@@ -53,65 +46,49 @@ const ProductsPage = () => {
 
   useEffect(() => {
     setFilters((current) => {
-      const nextCategories = categoryQuery ? categoryQuery.split(',') : [];
-      const categoriesEqual =
-        current.categories.length === nextCategories.length &&
-        current.categories.every((c) => nextCategories.includes(c));
+      const next = {
+        category: categoryQuery || 'All',
+        minPrice: minPriceQuery,
+        maxPrice: maxPriceQuery,
+        sortBy: sortByQuery
+      };
 
       if (
-        categoriesEqual &&
-        current.minPrice === minPriceQuery &&
-        current.maxPrice === maxPriceQuery &&
-        current.sortBy === sortByQuery
+        current.category === next.category &&
+        current.minPrice === next.minPrice &&
+        current.maxPrice === next.maxPrice &&
+        current.sortBy === next.sortBy
       ) {
         return current;
       }
 
-      return {
-        ...current,
-        categories: nextCategories,
-        minPrice: minPriceQuery,
-        maxPrice: maxPriceQuery,
-        sortBy: sortByQuery || 'newest'
-      };
+      return next;
     });
   }, [categoryQuery, minPriceQuery, maxPriceQuery, sortByQuery]);
 
   useEffect(() => {
-    let result = visibleProducts;
+    const search = searchQuery;
+    const category = categoryQuery;
 
-    // Search Query
-    if (searchQuery) {
-      const term = searchQuery.toLowerCase();
+    let result = visibleProducts;
+    if (search) {
       result = result.filter(
         (p) =>
-          (p.name || '').toLowerCase().includes(term) ||
-          (p.description || '').toLowerCase().includes(term) ||
-          (p.category || '').toLowerCase().includes(term)
+          (p.name || '').toLowerCase().includes(search.toLowerCase()) ||
+          (p.category || '').toLowerCase().includes(search.toLowerCase())
       );
+    } else if (category) {
+      const canonicalCategory = getCanonicalCategoryKeyFromQuery(category);
+      if (canonicalCategory && canonicalCategory !== 'All') {
+        result = result.filter((p) => p.category === canonicalCategory);
+      }
     }
 
-    // Category
-    if (filters.categories.length > 0) {
-      result = result.filter((p) => {
-        return filters.categories.some(cat => {
-          const canonical = getCanonicalCategoryKeyFromQuery(cat);
-          return p.category === canonical || p.category === cat;
-        });
-      });
-    }
-
-    // Price filters
     if (filters.minPrice) {
       result = result.filter((p) => p.price >= Number(filters.minPrice));
     }
     if (filters.maxPrice) {
       result = result.filter((p) => p.price <= Number(filters.maxPrice));
-    }
-
-    // Stock Filter
-    if (filters.inStockOnly) {
-      result = result.filter((p) => p.inStock);
     }
 
     // Sort
@@ -135,69 +112,66 @@ const ProductsPage = () => {
     result = sorted;
 
     setFilteredProducts(result);
-  }, [products, filters, searchQuery]);
-
-  const handleCategoryToggle = (category) => {
-    let updatedCategories;
-    if (filters.categories.includes(category)) {
-      updatedCategories = filters.categories.filter((c) => c !== category);
-    } else {
-      updatedCategories = [...filters.categories, category];
-    }
-    
-    setFilters((prev) => ({ ...prev, categories: updatedCategories }));
-    
-    const newParams = new URLSearchParams(searchParams);
-    if (updatedCategories.length > 0) {
-      newParams.set('category', updatedCategories.join(','));
-    } else {
-      newParams.delete('category');
-    }
-    setSearchParams(newParams);
-  };
+  }, [products, filters, searchQuery, categoryQuery]);
 
   const handleFilterChange = (key, value) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
+    const newFilters = { ...filters, [key]: value };
+    setFilters(newFilters);
     
-    const newParams = new URLSearchParams(searchParams);
-    if (value) {
-      newParams.set(key, value);
-    } else {
-      newParams.delete(key);
-    }
-    setSearchParams(newParams);
-  };
-
-  const handleToggleStock = () => {
-    setFilters((prev) => ({ ...prev, inStockOnly: !prev.inStockOnly }));
+    const params = {};
+    if (newFilters.category !== 'All') params.category = newFilters.category;
+    if (newFilters.minPrice) params.minPrice = newFilters.minPrice;
+    if (newFilters.maxPrice) params.maxPrice = newFilters.maxPrice;
+    if (newFilters.sortBy !== 'newest') params.sortBy = newFilters.sortBy;
+    if (searchQuery) params.search = searchQuery;
+    setSearchParams(params);
   };
 
   const clearFilters = () => {
     setFilters({
-      categories: [],
+      category: 'All',
       minPrice: '',
       maxPrice: '',
-      sortBy: 'newest',
-      inStockOnly: false
+      sortBy: 'newest'
     });
-    setSearchParams({});
+    setSearchParams(searchQuery ? { search: searchQuery } : {});
   };
 
-  const activeFiltersCount = 
-    filters.categories.length + 
-    (filters.minPrice ? 1 : 0) + 
-    (filters.maxPrice ? 1 : 0) + 
-    (filters.inStockOnly ? 1 : 0);
+  const activeFiltersCount = [
+    filters.category !== 'All',
+    filters.minPrice !== '',
+    filters.maxPrice !== ''
+  ].filter(Boolean).length;
+
+  // Stagger grid variants
+  const gridContainerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.05
+      }
+    }
+  };
+
+  const cardItemVariants = {
+    hidden: { opacity: 0, y: 15 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.35, ease: 'easeOut' }
+    }
+  };
 
   const renderFilterControls = ({ onClose } = {}) => (
     <>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="font-semibold text-luxury-900">Filters</h2>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="font-serif text-lg font-bold text-luxury-900">Filters</h2>
         <div className="flex items-center gap-3">
           {activeFiltersCount > 0 && (
             <button
               onClick={clearFilters}
-              className="text-sm text-gold-600 hover:text-gold-700"
+              className="text-xs text-gold-600 hover:text-gold-700 font-bold uppercase tracking-wider"
             >
               Clear all
             </button>
@@ -205,7 +179,7 @@ const ProductsPage = () => {
           {onClose && (
             <button
               onClick={onClose}
-              className="rounded-lg p-2 text-luxury-600 transition-colors hover:bg-luxury-100 hover:text-gold-600"
+              className="p-1.5 rounded-full hover:bg-luxury-50 text-luxury-500 hover:text-luxury-800 transition-colors"
               aria-label="Close filters"
             >
               <X className="h-5 w-5" />
@@ -214,71 +188,59 @@ const ProductsPage = () => {
         </div>
       </div>
 
-      {/* Category */}
+      {/* Category (Pills format) */}
       <div className="mb-6">
-        <h3 className="text-sm font-medium text-luxury-700 mb-2">Categories</h3>
-        <div className="space-y-2">
-          {categories.map(category => (
-            <label key={category} className="flex items-center cursor-pointer select-none">
-              <input
-                type="checkbox"
-                checked={filters.categories.includes(category)}
-                onChange={() => handleCategoryToggle(category)}
-                className="w-4 h-4 rounded text-gold-600 border-luxury-300 focus:ring-gold-500 cursor-pointer"
-              />
-              <span className="ml-2 text-sm text-luxury-600 hover:text-gold-600 transition-colors">
+        <h3 className="text-xs font-bold text-luxury-800 uppercase tracking-wider mb-3">Category</h3>
+        <div className="flex flex-wrap gap-2">
+          {categories.map(category => {
+            const active = filters.category === category;
+            return (
+              <button 
+                key={category}
+                type="button"
+                onClick={() => handleFilterChange('category', category)}
+                className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                  active 
+                    ? 'bg-gold-500 text-white border-gold-500 shadow-sm'
+                    : 'bg-white text-luxury-700 border-luxury-200 hover:border-gold-400 hover:text-gold-600'
+                }`}
+              >
                 {getCategoryLabel(category)}
-              </span>
-            </label>
-          ))}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Availability */}
-      <div className="mb-6 border-t border-luxury-100 pt-4">
-        <h3 className="text-sm font-medium text-luxury-700 mb-2">Availability</h3>
-        <label className="flex items-center cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={filters.inStockOnly}
-            onChange={handleToggleStock}
-            className="w-4 h-4 rounded text-gold-600 border-luxury-300 focus:ring-gold-500 cursor-pointer"
-          />
-          <span className="ml-2 text-sm text-luxury-600 hover:text-gold-600 transition-colors">
-            In Stock Only
-          </span>
-        </label>
-      </div>
-
       {/* Price Range */}
-      <div className="mb-6 border-t border-luxury-100 pt-4">
-        <h3 className="text-sm font-medium text-luxury-700 mb-2">Price Range</h3>
+      <div className="mb-6">
+        <h3 className="text-xs font-bold text-luxury-800 uppercase tracking-wider mb-3">Price Range</h3>
         <div className="flex items-center gap-2">
           <input
             type="number"
             placeholder="Min"
             value={filters.minPrice}
             onChange={(e) => handleFilterChange('minPrice', e.target.value)}
-            className="w-full px-3 py-2 border border-luxury-200 rounded-lg text-sm"
+            className="w-full px-3 py-2 border border-luxury-200 rounded-lg text-xs focus:ring-1 focus:ring-gold-500 outline-none"
           />
-          <span className="text-luxury-400">-</span>
+          <span className="text-luxury-400 text-xs">-</span>
           <input
             type="number"
             placeholder="Max"
             value={filters.maxPrice}
             onChange={(e) => handleFilterChange('maxPrice', e.target.value)}
-            className="w-full px-3 py-2 border border-luxury-200 rounded-lg text-sm"
+            className="w-full px-3 py-2 border border-luxury-200 rounded-lg text-xs focus:ring-1 focus:ring-gold-500 outline-none"
           />
         </div>
       </div>
 
       {/* Sort */}
-      <div className="border-t border-luxury-100 pt-4">
-        <h3 className="text-sm font-medium text-luxury-700 mb-2">Sort By</h3>
+      <div>
+        <h3 className="text-xs font-bold text-luxury-800 uppercase tracking-wider mb-3">Sort By</h3>
         <select
           value={filters.sortBy}
           onChange={(e) => handleFilterChange('sortBy', e.target.value)}
-          className="w-full px-3 py-2 border border-luxury-200 rounded-lg text-sm bg-white"
+          className="w-full px-3 py-2 border border-luxury-200 rounded-lg text-xs bg-white text-luxury-700 outline-none focus:ring-1 focus:ring-gold-500"
         >
           {sortOptions.map(option => (
             <option key={option.value} value={option.value}>
@@ -291,204 +253,178 @@ const ProductsPage = () => {
   );
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 24 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.8, ease: 'easeOut' }}
-      className="min-h-screen bg-luxury-50 py-8"
-    >
+    <div className="min-h-screen bg-luxury-50 py-8">
       <SEOHelmet 
-        title={`${filters.categories.length === 1 ? getCategoryLabel(filters.categories[0]) : 'All'} Necklaces | Panstellia`}
-        description={`Browse our ${filters.categories.length > 0 ? filters.categories.map(c => getCategoryLabel(c)).join(', ') : 'complete collection of'} necklace jewelry. Premium quality designs for every occasion.`}
-        keywords={`${filters.categories.length > 0 ? filters.categories.map(c => getCategoryLabel(c).toLowerCase()).join(', ') : 'necklaces'}, jewelry, luxury jewelry`}
-        canonical={`https://panstellia.com/products${filters.categories.length > 0 ? `?category=${filters.categories.join(',')}` : ''}`}
+        title={`${filters.category !== 'All' ? getCategoryLabel(filters.category) : 'All'} Necklaces | Panstellia`}
+        description={`Browse our ${filters.category !== 'All' ? getCategoryLabel(filters.category).toLowerCase() : 'complete collection of'} necklace jewelry. Premium quality designs for every occasion.`}
+        keywords={`${filters.category !== 'All' ? getCategoryLabel(filters.category).toLowerCase() + ' necklaces' : 'necklaces'}, jewelry, luxury jewelry`}
+        canonical={`https://panstellia.com/products${filters.category !== 'All' ? `?category=${filters.category}` : ''}`}
       />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-16 md:mt-8">
+        {/* Breadcrumb Trail */}
+        <nav className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-luxury-400 mb-6">
+          <Link to="/" className="hover:text-gold-500 transition-colors">Home</Link>
+          <span>/</span>
+          <Link to="/products" className="hover:text-gold-500 transition-colors">Shop</Link>
+          {filters.category !== 'All' && (
+            <>
+              <span>/</span>
+              <span className="text-luxury-800">{getCategoryLabel(filters.category)}</span>
+            </>
+          )}
+        </nav>
+
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="font-serif text-3xl md:text-4xl font-bold text-luxury-900">
-            {filters.categories.length === 1 
-              ? getCategoryLabel(filters.categories[0]) 
-              : filters.categories.length > 1 
-                ? 'Filtered Collection' 
-                : 'All Products'}
-          </h1>
-          <p className="mt-2 text-luxury-600">
-            {filteredProducts.length} {filteredProducts.length === 1 ? 'product' : 'products'} found
-          </p>
+        <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div>
+            <h1 className="font-serif text-3xl md:text-4xl font-bold text-luxury-900 leading-tight">
+              {filters.category !== 'All' ? getCategoryLabel(filters.category) : 'All Products'}
+            </h1>
+            <p className="mt-2 text-xs text-luxury-500 font-medium">
+              {filteredProducts.length} items found
+            </p>
+          </div>
+
+          {/* View Toolbar Controls */}
+          <div className="flex items-center justify-between md:justify-end gap-4">
+            <button
+              onClick={() => setShowFilters(true)}
+              className="lg:hidden flex items-center px-4 py-2 border border-luxury-200 bg-white rounded-lg shadow-sm text-xs font-semibold text-luxury-700"
+            >
+              <Filter className="w-3.5 h-3.5 mr-2" />
+              Filters
+              {activeFiltersCount > 0 && (
+                <span className="ml-1.5 w-4 h-4 bg-gold-500 text-white text-[9px] rounded-full flex items-center justify-center font-bold">
+                  {activeFiltersCount}
+                </span>
+              )}
+            </button>
+
+            <div className="flex items-center bg-white rounded-lg shadow-sm border border-luxury-200">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`p-2 rounded-l-lg ${viewMode === 'grid' ? 'text-gold-600 bg-luxury-50' : 'text-luxury-400'}`}
+                aria-label="Grid view"
+              >
+                <Grid className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-2 rounded-r-lg ${viewMode === 'list' ? 'text-gold-600 bg-luxury-50' : 'text-luxury-400'}`}
+                aria-label="List view"
+              >
+                <List className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="flex flex-col lg:flex-row gap-8">
-          {/* Filters Sidebar */}
-          <div className="hidden lg:block lg:w-64 flex-shrink-0">
-            <div className="bg-white rounded-xl shadow-md p-6 sticky top-24">
+          {/* Desktop Filters Sidebar */}
+          <aside className="hidden lg:block lg:w-56 flex-shrink-0">
+            <div className="bg-white rounded-xl shadow-md p-5 sticky top-24 border border-luxury-100">
               {renderFilterControls()}
             </div>
-          </div>
+          </aside>
 
-          {/* Products Grid */}
-          <div className="flex-1">
-            {/* Toolbar */}
-            <div className="flex items-center justify-between mb-6">
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className="lg:hidden flex items-center px-4 py-2 bg-white rounded-lg shadow text-luxury-700"
-              >
-                <Filter className="w-4 h-4 mr-2" />
-                Filters
-                {activeFiltersCount > 0 && (
-                  <span className="ml-2 w-5 h-5 bg-gold-500 text-white text-xs rounded-full flex items-center justify-center">
-                    {activeFiltersCount}
-                  </span>
-                )}
-              </button>
-
-              <div className="flex items-center gap-4">
-                {/* Mobile Filters - Show on mobile */}
-                {showFilters && (
-                  <div className="lg:hidden fixed inset-x-4 top-24 z-50 max-h-[calc(100vh-7rem)] overflow-y-auto rounded-xl bg-white p-5 shadow-2xl">
-                    {renderFilterControls({ onClose: () => setShowFilters(false) })}
-                    <div className="mt-6 grid grid-cols-2 gap-3">
-                      <button
-                        onClick={clearFilters}
-                        className="btn-secondary px-4 py-2 text-sm"
-                      >
-                        Reset
-                      </button>
-                      <button
-                        onClick={() => setShowFilters(false)}
-                        className="btn-primary px-4 py-2 text-sm"
-                      >
-                        Apply
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                <div className="hidden md:flex items-center bg-white rounded-lg shadow">
-                  <button
-                    onClick={() => setViewMode('grid')}
-                    className={`p-2 ${viewMode === 'grid' ? 'text-gold-600' : 'text-luxury-400'}`}
-                  >
-                    <Grid className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={() => setViewMode('list')}
-                    className={`p-2 ${viewMode === 'list' ? 'text-gold-600' : 'text-luxury-400'}`}
-                  >
-                    <List className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Mobile Filters Overlay */}
+          {/* Mobile Filter Slide-in Drawer */}
+          <AnimatePresence>
             {showFilters && (
-              <div className="lg:hidden fixed inset-0 bg-black/50 z-40" onClick={() => setShowFilters(false)} />
-            )}
+              <div className="lg:hidden fixed inset-0 z-50">
+                {/* Backdrop */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  onClick={() => setShowFilters(false)}
+                  className="fixed inset-0 bg-black/40"
+                />
 
-            {/* Active Filters Chips */}
-            {activeFiltersCount > 0 && (
-              <div className="flex flex-wrap gap-2 mb-6 items-center">
-                <span className="text-xs text-luxury-500 font-medium">Active Filters:</span>
-                {filters.categories.map((cat) => (
-                  <div
-                    key={cat}
-                    className="flex items-center gap-1 bg-white border border-luxury-200 text-luxury-700 text-xs px-2.5 py-1 rounded-full shadow-sm animate-fade-in"
-                  >
-                    <span>{getCategoryLabel(cat)}</span>
-                    <button
-                      onClick={() => handleCategoryToggle(cat)}
-                      className="hover:text-red-500 transition-colors ml-1"
-                      aria-label={`Remove category filter ${getCategoryLabel(cat)}`}
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))}
-                {filters.minPrice && (
-                  <div className="flex items-center gap-1 bg-white border border-luxury-200 text-luxury-700 text-xs px-2.5 py-1 rounded-full shadow-sm animate-fade-in">
-                    <span>Min: ₹{Number(filters.minPrice).toLocaleString()}</span>
-                    <button
-                      onClick={() => handleFilterChange('minPrice', '')}
-                      className="hover:text-red-500 transition-colors ml-1"
-                      aria-label="Remove minimum price filter"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                )}
-                {filters.maxPrice && (
-                  <div className="flex items-center gap-1 bg-white border border-luxury-200 text-luxury-700 text-xs px-2.5 py-1 rounded-full shadow-sm animate-fade-in">
-                    <span>Max: ₹{Number(filters.maxPrice).toLocaleString()}</span>
-                    <button
-                      onClick={() => handleFilterChange('maxPrice', '')}
-                      className="hover:text-red-500 transition-colors ml-1"
-                      aria-label="Remove maximum price filter"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                )}
-                {filters.inStockOnly && (
-                  <div className="flex items-center gap-1 bg-white border border-luxury-200 text-luxury-700 text-xs px-2.5 py-1 rounded-full shadow-sm animate-fade-in">
-                    <span>In Stock Only</span>
-                    <button
-                      onClick={handleToggleStock}
-                      className="hover:text-red-500 transition-colors ml-1"
-                      aria-label="Remove in stock filter"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                )}
-                <button
-                  onClick={clearFilters}
-                  className="text-xs text-gold-600 hover:text-gold-700 font-medium ml-2 hover:underline animate-fade-in"
+                {/* Left Side Drawer */}
+                <motion.div
+                  initial={{ x: '-100%' }}
+                  animate={{ x: 0 }}
+                  exit={{ x: '-100%' }}
+                  transition={{ type: 'tween', duration: 0.3, ease: 'easeOut' }}
+                  className="fixed inset-y-0 left-0 w-72 bg-white shadow-2xl p-6 flex flex-col justify-between overflow-y-auto"
                 >
-                  Clear all
-                </button>
+                  <div>
+                    {renderFilterControls({ onClose: () => setShowFilters(false) })}
+                  </div>
+
+                  <div className="mt-8 grid grid-cols-2 gap-3 border-t border-luxury-100 pt-4">
+                    <button
+                      onClick={() => {
+                        clearFilters();
+                        setShowFilters(false);
+                      }}
+                      className="btn-secondary py-2 text-xs"
+                    >
+                      Reset
+                    </button>
+                    <button
+                      onClick={() => setShowFilters(false)}
+                      className="btn-primary py-2 text-xs"
+                    >
+                      Apply
+                    </button>
+                  </div>
+                </motion.div>
               </div>
             )}
+          </AnimatePresence>
 
-            {/* Products */}
+          {/* Products Container */}
+          <main className="flex-1">
             {loading ? (
               <div className="grid grid-cols-2 md:grid-cols-3 gap-6">
-                {Array(8).fill(0).map((_, i) => (
-                  <div key={i} className="bg-white rounded-xl overflow-hidden">
-                    <div className="skeleton aspect-[3/4]"></div>
+                {Array(6).fill(0).map((_, i) => (
+                  <div key={i} className="bg-white rounded-xl overflow-hidden shadow-sm border border-luxury-100">
+                    <div className="skeleton aspect-[3/4] bg-luxury-100 animate-shimmer bg-gradient-to-r from-luxury-100 via-luxury-50 to-luxury-100 bg-[length:200%_100%] h-64" />
                     <div className="p-4 space-y-2">
-                      <div className="skeleton h-4 w-3/4"></div>
-                      <div className="skeleton h-4 w-1/2"></div>
+                      <div className="skeleton h-3 w-3/4 bg-luxury-200 rounded" />
+                      <div className="skeleton h-3 w-1/2 bg-luxury-200 rounded" />
                     </div>
                   </div>
                 ))}
               </div>
             ) : filteredProducts.length === 0 ? (
-              <div className="text-center py-16">
-                <p className="text-luxury-600 text-lg">No products found</p>
+              <div className="text-center py-16 bg-white rounded-xl shadow-sm border border-luxury-100">
+                <p className="text-luxury-600 font-medium">No products match your filter criteria.</p>
                 <button
                   onClick={clearFilters}
-                  className="mt-4 btn-secondary"
+                  className="mt-4 btn-secondary py-2 px-6 text-xs"
                 >
                   Clear Filters
                 </button>
               </div>
             ) : (
-              <div className={`grid auto-rows-fr items-stretch gap-6 ${
-                viewMode === 'grid' 
-                  ? 'grid-cols-2 md:grid-cols-3' 
-                  : 'grid-cols-1'
-              }`}>
+              <motion.div 
+                variants={gridContainerVariants}
+                initial="hidden"
+                animate="visible"
+                className={`grid gap-4 sm:gap-6 ${
+                  viewMode === 'grid' 
+                    ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4' 
+                    : 'grid-cols-1 sm:grid-cols-2'
+                }`}
+              >
                 {filteredProducts.map((product, index) => (
-                  <ProductCard key={product.id} product={product} priority={index < 6} />
+                  <motion.div
+                    key={product.id}
+                    variants={cardItemVariants}
+                    className="h-full"
+                  >
+                    <ProductCard product={product} priority={index < 4} />
+                  </motion.div>
                 ))}
-              </div>
+              </motion.div>
             )}
-          </div>
+          </main>
         </div>
       </div>
-    </motion.div>
+    </div>
   );
 };
 

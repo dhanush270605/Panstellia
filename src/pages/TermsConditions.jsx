@@ -47,9 +47,9 @@ const TermsConditionsPage = () => {
               <X className="w-6 h-6 text-luxury-600" />
             </button>
             <div className="flex items-center gap-3">
-              <Link to="/" className="flex items-center gap-2 text-luxury-600 hover:text-gold-600 text-sm font-medium transition-colors">
+              <Link to="/products" className="flex items-center gap-2 text-luxury-600 hover:text-gold-600 text-sm font-medium transition-colors">
                 <ArrowLeft className="w-4 h-4" />
-                Back to Home
+                Back to Shop
               </Link>
             </div>
           </div>
