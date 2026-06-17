@@ -110,7 +110,7 @@ const HomePage = () => {
     {
       icon: RefreshCw,
       title: 'Easy Returns',
-      description: '5-day return policy'
+      description: '3-4 days return policy'
     },
     {
       icon: Star,
@@ -182,7 +182,7 @@ const HomePage = () => {
     }
   };
 
-  const marqueeText = "⭐ 4.9/5 Rating  |  2,000+ Happy Customers  |  Free Shipping on ₹999+  |  Easy 30-Day Returns  |  Handcrafted in India  |  ";
+  const marqueeText = "⭐ 4.6/5 Rating  |  2,000+ Happy Customers  |  Free Shipping on ₹999+  |  easy 3 -4 days return  |  handcrafted in korea  |  ";
 
   return (
     <div className="min-h-screen bg-luxury-50">
